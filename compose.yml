@@ -1,0 +1,98 @@
+name: monitoring
+
+services:
+  # VictoriaMetrics single-node: stores metrics
+  victoriametrics:
+    image: docker.io/victoriametrics/victoria-metrics:v1.139.0
+    container_name: victoriametrics
+    restart: unless-stopped
+    volumes:
+      - vmdata:/storage
+    command:
+      - "--storageDataPath=/storage"
+      - "--httpListenAddr=:8428"
+      - "--vmalert.proxyURL=http://vmalert:8880"
+      - "--retentionPeriod=12"  # 12 months retention
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8428/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # VMAgent: lightweight scraping agent
+  vmagent:
+    image: docker.io/victoriametrics/vmagent:v1.139.0
+    container_name: vmagent
+    restart: unless-stopped
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    volumes:
+      - vmagentdata:/vmagentdata
+      - ./config/vmagent/scrape.yml:/etc/prometheus/prometheus.yml:z,ro
+    command:
+      - "--promscrape.config=/etc/prometheus/prometheus.yml"
+      - "--remoteWrite.url=http://victoriametrics:8428/api/v1/write"
+
+  # VMAlert: evaluates alerting & recording rules
+  vmalert:
+    image: docker.io/victoriametrics/vmalert:v1.139.0
+    container_name: vmalert
+    restart: unless-stopped
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    volumes:
+      - ./config/vmalert/rules:/etc/alerts:z,ro
+    command:
+      - "--datasource.url=http://victoriametrics:8428/"
+      - "--remoteRead.url=http://victoriametrics:8428/"
+      - "--remoteWrite.url=http://vmagent:8429/"
+      - "--notifier.url=http://alertmanager:9093/"
+      - "--rule=/etc/alerts/*.yml"
+      - "--external.url=http://grafana:3000"
+      - '--external.alert.source=explore?orgId=1&left={"datasource":"VictoriaMetrics","queries":[{"expr":{{.Expr|jsonEscape|queryEscape}},"refId":"A"}],"range":{"from":"{{ .ActiveAt.UnixMilli }}","to":"now"}}'
+
+  # Alertmanager: receives notifications from vmalert
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/config/alertmanager.yml:z,ro
+      - alertmanagerdata:/alertmanager
+    command:
+      - "--config.file=/config/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+
+  # Grafana: dashboards and visualization
+  grafana:
+    image: docker.io/grafana/grafana:12.2.0
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    env_file:
+      - env/grafana.env
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:z,ro
+      - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:z,ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.afges.eu`)"
+      - "traefik.http.routers.grafana.entrypoints=https"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+volumes:
+  vmdata: {}
+  vmagentdata: {}
+  grafanadata: {}
+  alertmanagerdata: {}
+
+networks:
+  default:
+    driver: bridge
+    name: monitoring
