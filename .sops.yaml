@@ -1,7 +1,7 @@
 # .sops.yaml
 creation_rules:
   - path_regex: env/\w+.env
-    encrypted_regex: "^(GF_SECURITY_ADMIN_PASSWORD)$"
+    encrypted_regex: "^(.+_PASSWORD|.+_SECRET)$"
     key_groups:
       - age:
           - age1hasavauxmejevz4kx9mn8cynj09675l9hhtsswkqr806mm97hpgsc67csu

@@ -18,6 +18,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - "pangolin.public-resources.victoriametrics.name=VictoriaMetrics"
+      - "pangolin.public-resources.victoriametrics.protocol=http"
+      - "pangolin.public-resources.victoriametrics.full-domain=victoriametrics.afges.eu"
+      - "pangolin.public-resources.victoriametrics.targets[0].method=http"
+      - "pangolin.public-resources.victoriametrics.targets[0].hostname=victoriametrics"
+      - "pangolin.public-resources.victoriametrics.targets[0].port=8428"
+      - "pangolin.public-resources.victoriametrics.targets[0].healthcheck.hostname=victoriametrics"
+      - "pangolin.public-resources.victoriametrics.targets[0].healthcheck.port=8428"
+      - "pangolin.public-resources.victoriametrics.targets[0].healthcheck.path=/-/healthy"
+      - "pangolin.public-resources.victoriametrics.targets[0].healthcheck.status=200"
 
   # VMAgent: lightweight scraping agent
   vmagent:
@@ -64,6 +75,17 @@ services:
     command:
       - "--config.file=/config/alertmanager.yml"
       - "--storage.path=/alertmanager"
+    labels:
+      - "pangolin.public-resources.alertmanager.name=Alertmanager"
+      - "pangolin.public-resources.alertmanager.protocol=http"
+      - "pangolin.public-resources.alertmanager.full-domain=alertmanager.afges.eu"
+      - "pangolin.public-resources.alertmanager.targets[0].method=http"
+      - "pangolin.public-resources.alertmanager.targets[0].hostname=alertmanager"
+      - "pangolin.public-resources.alertmanager.targets[0].port=9093"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.hostname=alertmanager"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.port=9093"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.path=/-/healthy"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.status=200"
 
   # Grafana: dashboards and visualization
   grafana:
@@ -80,11 +102,26 @@ services:
       - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:z,ro
       - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:z,ro
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.afges.eu`)"
-      - "traefik.http.routers.grafana.entrypoints=https"
-      - "traefik.http.routers.grafana.tls=true"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "pangolin.public-resources.grafana.name=Grafana"
+      - "pangolin.public-resources.grafana.protocol=http"
+      - "pangolin.public-resources.grafana.full-domain=grafana.afges.eu"
+      - "pangolin.public-resources.grafana.targets[0].method=http"
+      - "pangolin.public-resources.grafana.targets[0].hostname=grafana"
+      - "pangolin.public-resources.grafana.targets[0].port=3000"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.hostname=grafana"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.port=3000"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.path=/api/health"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.status=200"
+
+  # Newt: Pangolin tunnel client – exposes services through the Pangolin reverse proxy
+  newt:
+    image: docker.io/fosrl/newt:latest
+    container_name: newt
+    restart: unless-stopped
+    env_file:
+      - env/newt.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
 volumes:
   vmdata: {}
