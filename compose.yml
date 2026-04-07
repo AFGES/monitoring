@@ -120,6 +120,10 @@ services:
     restart: unless-stopped
     env_file:
       - env/newt.env
+    environment:
+      NO_CLOUD: true
+      LOG_LEVEL: debug
+      DOCKER_SOCKET: /var/run/docker.sock
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
