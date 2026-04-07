@@ -14,7 +14,7 @@ services:
       - "--vmalert.proxyURL=http://vmalert:8880"
       - "--retentionPeriod=12"  # 12 months retention
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8428/-/healthy"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8428/-/healthy"]
       interval: 10s
       timeout: 5s
       retries: 5
