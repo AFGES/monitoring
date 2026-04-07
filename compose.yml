@@ -113,17 +113,33 @@ services:
       - "pangolin.public-resources.grafana.targets[0].healthcheck.path=/api/health"
       - "pangolin.public-resources.grafana.targets[0].healthcheck.status=200"
 
+  # Socket proxy: limits Docker API access for Newt (read-only, CONTAINERS+EVENTS only)
+  socket-proxy:
+    image: docker.io/tecnativa/docker-socket-proxy:latest
+    container_name: socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      EVENTS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket-proxy
+
   # Newt: Pangolin tunnel client – exposes services through the Pangolin reverse proxy
   newt:
     image: docker.io/fosrl/newt:latest
     container_name: newt
     restart: unless-stopped
+    depends_on:
+      - socket-proxy
     env_file:
       - env/newt.env
     environment:
-      DOCKER_SOCKET: /var/run/docker.sock
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      DOCKER_SOCKET: tcp://socket-proxy:2375
+    networks:
+      - default
+      - socket-proxy
 
 volumes:
   vmdata: {}
@@ -135,3 +151,7 @@ networks:
   default:
     driver: bridge
     name: monitoring
+  socket-proxy:
+    driver: bridge
+    name: monitoring-socket-proxy
+    internal: true
